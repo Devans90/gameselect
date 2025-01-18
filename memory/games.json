@@ -1,0 +1,104 @@
+{
+  "1": {
+    "game_id": 1,
+    "team_id": 1,
+    "title": "Monopoly",
+    "image_url": null
+  },
+  "2": {
+    "game_id": 2,
+    "team_id": 1,
+    "title": "Dog Game",
+    "image_url": null
+  },
+  "3": {
+    "game_id": 3,
+    "team_id": 1,
+    "title": "Sausage",
+    "image_url": null
+  },
+  "4": {
+    "game_id": 4,
+    "team_id": 2,
+    "title": "Sausage",
+    "image_url": null
+  },
+  "5": {
+    "game_id": 5,
+    "team_id": 2,
+    "title": "green",
+    "image_url": null
+  },
+  "6": {
+    "game_id": 6,
+    "team_id": 2,
+    "title": "hunger games",
+    "image_url": null
+  },
+  "7": {
+    "game_id": 7,
+    "team_id": 2,
+    "title": "fido",
+    "image_url": null
+  },
+  "8": {
+    "game_id": 8,
+    "team_id": 2,
+    "title": "dracula",
+    "image_url": null
+  },
+  "9": {
+    "game_id": 9,
+    "team_id": 2,
+    "title": "spyro",
+    "image_url": null
+  },
+  "10": {
+    "game_id": 10,
+    "team_id": 2,
+    "title": "25",
+    "image_url": null
+  },
+  "11": {
+    "game_id": 11,
+    "team_id": 2,
+    "title": "donatello",
+    "image_url": null
+  },
+  "12": {
+    "game_id": 12,
+    "team_id": 2,
+    "title": "leanardo",
+    "image_url": null
+  },
+  "13": {
+    "game_id": 13,
+    "team_id": 2,
+    "title": "puppy",
+    "image_url": null
+  },
+  "14": {
+    "game_id": 14,
+    "team_id": 2,
+    "title": "pizza",
+    "image_url": null
+  },
+  "15": {
+    "game_id": 15,
+    "team_id": 7,
+    "title": "Donatello",
+    "image_url": null
+  },
+  "16": {
+    "game_id": 16,
+    "team_id": 7,
+    "title": "Splinter",
+    "image_url": null
+  },
+  "17": {
+    "game_id": 17,
+    "team_id": 7,
+    "title": "Leanardo",
+    "image_url": null
+  }
+}

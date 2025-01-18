@@ -1,45 +1,63 @@
 """
-Example Implementation Using Dash (Plotly) + Pydantic Models (In-Memory Storage)
--------------------------------------------------------------------------------
-This is a minimal prototype illustrating how you could build a self-hosted
-app for:
-  1. Submitting games (with optional images) for a specific Team.
-  2. Pairwise (A/B) voting on those games.
-  3. Generating results using a simple Bradley-Terry-like approach.
+Full Dash App with Bradley-Terry Iterative Algorithm & Local JSON Persistence
+-----------------------------------------------------------------------------
+- Automatically loads existing teams (and other data) on startup, showing them
+  in the team dropdown.
+- Uses Pydantic models (compatible with Pydantic 2.x by calling model_dump()
+  instead of .dict()).
+- Stores data (teams, games, votes) in local JSON files in a 'memory' folder
+  for persistence between app runs.
+- Implements an iterative Bradley-Terry approach to compute preference scores
+  from pairwise votes (A/B). Accounts for zero-win games to avoid KeyErrors.
+- Uses suppress_callback_exceptions=True to allow dynamic (stage-based) layout
+  rendering.
 
-Key Points:
- - In-memory storage is used for simplicity. In production, use a database.
- - We show a naive logistic regression approach (via scikit-learn) to approximate
-   Bradley-Terry; you can swap in a dedicated library (e.g. pybradleyterry2) if you prefer.
- - This code can be run directly with `python <filename>.py` once Dash and required
-   dependencies are installed. Then open http://127.0.0.1:8050 in your browser.
- - Minimal error handling and no authentication. Meant only as a starting prototype.
+How to Run:
+-----------
+1) Ensure you have a folder named 'memory' in the same directory as this script,
+   or let the script create it automatically.
+2) pip install dash dash_bootstrap_components plotly pydantic pandas numpy
+3) python app.py
+4) Open http://127.0.0.1:8050 in your browser.
 
-Dependencies (Install Separately):
- - dash, dash_bootstrap_components
- - pydantic
- - scikit-learn
- - plotly
+Flow:
+-----
+- Create a Team (or select an existing one if present in the dropdown).
+- Stage = "Submit": add games.
+- Stage = "Vote": do pairwise votes.
+- Stage = "Results": see final ranking using Bradley-Terry.
+
+Note:
+-----
+If you see a warning or error about aggregator usage in pandas, we switched
+to direct `.sum()` calls so it should be fine. For Pydantic 2, we replaced
+`.dict()` with `.model_dump()`.
 """
 
-from typing import Optional, List, Dict
-from pydantic import BaseModel
+import os
+import json
+import logging
+from typing import Dict, List, Optional
+from collections import Counter
+import random
+
 import dash
 import dash_bootstrap_components as dbc
-from dash import dcc, html, Input, Output, State
+from dash import dcc, html, Input, Output, State, callback_context
 import plotly.express as px
 import numpy as np
+import pandas as pd
 
-from sklearn.linear_model import LogisticRegression
+from pydantic import BaseModel, Field
 
-# -------------------------------------------------------------------------------------
-# 1) Pydantic Models
-# -------------------------------------------------------------------------------------
 
+# ------------------------------------------------------------------------------
+# 1) Pydantic Models (Use model_dump() for Pydantic v2+)
+# ------------------------------------------------------------------------------
 class TeamModel(BaseModel):
     team_id: int
     name: str
-    stage: str  # one of ["submit", "vote", "results"]
+    stage: str = Field(default="submit")  # "submit", "vote", or "results"
 
 class GameModel(BaseModel):
     game_id: int
@@ -48,196 +66,300 @@ class GameModel(BaseModel):
     image_url: Optional[str] = None
 
 class VoteModel(BaseModel):
-    """
-    Represents a single pairwise comparison result (A vs. B).
-    winner_id: The ID of the game that won.
-    loser_id:  The ID of the game that lost.
-    """
     vote_id: int
     team_id: int
     winner_id: int
     loser_id: int
 
-class UserModel(BaseModel):
-    user_id: int
-    username: str
 
-# -------------------------------------------------------------------------------------
-# 2) In-Memory Data Store (Dictionaries for simplicity)
-# -------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# 2) File Storage Paths
+# ------------------------------------------------------------------------------
+DATA_DIR = "memory"
+TEAMS_FILE = os.path.join(DATA_DIR, "teams.json")
+GAMES_FILE = os.path.join(DATA_DIR, "games.json")
+VOTES_FILE = os.path.join(DATA_DIR, "votes.json")
+COUNTERS_FILE = os.path.join(DATA_DIR, "counters.json")
+
+
+# ------------------------------------------------------------------------------
+# 3) In-Memory Data Structures
+# ------------------------------------------------------------------------------
 teams: Dict[int, TeamModel] = {}
 games: Dict[int, GameModel] = {}
 votes: Dict[int, VoteModel] = {}
-users: Dict[int, UserModel] = {}
 
-# We'll keep counters to auto-increment IDs
 team_counter = 1
 game_counter = 1
 vote_counter = 1
-user_counter = 1
 
-# -------------------------------------------------------------------------------------
-# 3) Helper / CRUD Functions
-# -------------------------------------------------------------------------------------
 
+# ------------------------------------------------------------------------------
+# 4) Data Persistence: Load & Save
+# ------------------------------------------------------------------------------
+def ensure_data_dir():
+    """Create the 'memory' folder if missing."""
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR)
+
+def load_data():
+    """Load existing data from JSON into in-memory structures."""
+    global teams, games, votes
+    global team_counter, game_counter, vote_counter
+
+    if os.path.isfile(TEAMS_FILE):
+        with open(TEAMS_FILE, "r") as f:
+            raw = json.load(f)
+            teams = {int(k): TeamModel(**v) for k, v in raw.items()}
+
+    if os.path.isfile(GAMES_FILE):
+        with open(GAMES_FILE, "r") as f:
+            raw = json.load(f)
+            games = {int(k): GameModel(**v) for k, v in raw.items()}
+
+    if os.path.isfile(VOTES_FILE):
+        with open(VOTES_FILE, "r") as f:
+            raw = json.load(f)
+            votes = {int(k): VoteModel(**v) for k, v in raw.items()}
+
+    if os.path.isfile(COUNTERS_FILE):
+        with open(COUNTERS_FILE, "r") as f:
+            counters = json.load(f)
+            team_counter = counters.get("team_counter", 1)
+            game_counter = counters.get("game_counter", 1)
+            vote_counter = counters.get("vote_counter", 1)
+
+def save_data():
+    """Save in-memory data to local JSON files."""
+    with open(TEAMS_FILE, "w") as f:
+        json.dump({k: v.model_dump() for k, v in teams.items()}, f, indent=2)
+
+    with open(GAMES_FILE, "w") as f:
+        json.dump({k: v.model_dump() for k, v in games.items()}, f, indent=2)
+
+    with open(VOTES_FILE, "w") as f:
+        json.dump({k: v.model_dump() for k, v in votes.items()}, f, indent=2)
+
+    with open(COUNTERS_FILE, "w") as f:
+        counters = {
+            "team_counter": team_counter,
+            "game_counter": game_counter,
+            "vote_counter": vote_counter
+        }
+        json.dump(counters, f, indent=2)
+
+
+# ------------------------------------------------------------------------------
+# 5) CRUD Functions
+# ------------------------------------------------------------------------------
 def create_team(name: str) -> int:
-    """
-    Creates a new Team in 'submit' stage and returns the team_id.
-    """
     global team_counter
     t_id = team_counter
     team_counter += 1
 
-    new_team = TeamModel(team_id=t_id, name=name, stage="submit")
-    teams[t_id] = new_team
+    teams[t_id] = TeamModel(team_id=t_id, name=name, stage="submit")
+    save_data()
     return t_id
 
-def set_team_stage(team_id: int, new_stage: str) -> None:
-    """
-    Updates the stage of a team (e.g. from 'submit' to 'vote' to 'results').
-    """
+def set_team_stage(team_id: int, new_stage: str):
     if team_id in teams:
-        team = teams[team_id]
-        team.stage = new_stage
-        teams[team_id] = team
+        t = teams[team_id]
+        t.stage = new_stage
+        teams[team_id] = t
+        save_data()
 
-def submit_game(team_id: int, title: str, image_url: Optional[str] = None) -> int:
-    """
-    Add a new game to the specified team.
-    """
+def submit_game(team_id: int, title: str, image_url: Optional[str]) -> int:
     global game_counter
     g_id = game_counter
     game_counter += 1
 
-    new_game = GameModel(
+    games[g_id] = GameModel(
         game_id=g_id,
         team_id=team_id,
         title=title,
         image_url=image_url
     )
-    games[g_id] = new_game
+    save_data()
     return g_id
 
 def record_vote(team_id: int, winner_id: int, loser_id: int) -> int:
-    """
-    Stores a new vote (winner over loser) for the given team.
-    """
     global vote_counter
     v_id = vote_counter
     vote_counter += 1
 
-    new_vote = VoteModel(
+    votes[v_id] = VoteModel(
         vote_id=v_id,
         team_id=team_id,
         winner_id=winner_id,
         loser_id=loser_id
     )
-    votes[v_id] = new_vote
+    save_data()
     return v_id
 
 def get_games_for_team(team_id: int) -> List[GameModel]:
-    """
-    Returns a list of all games belonging to the specified team.
-    """
     return [g for g in games.values() if g.team_id == team_id]
 
 def get_votes_for_team(team_id: int) -> List[VoteModel]:
-    """
-    Returns a list of all votes for the specified team.
-    """
     return [v for v in votes.values() if v.team_id == team_id]
 
 def get_team_stage(team_id: int) -> str:
-    """
-    Returns the current stage of the team, or 'none' if not found.
-    """
     if team_id in teams:
         return teams[team_id].stage
     return "none"
 
-# -------------------------------------------------------------------------------------
-# 4) Bradley-Terry Approx (via Logistic Regression)
-# -------------------------------------------------------------------------------------
+
+# ------------------------------------------------------------------------------
+# 6) Bradley-Terry Iterative Implementation
+# ------------------------------------------------------------------------------
+def bradley_terry_analysis(df: pd.DataFrame,
+                           max_iters: int = 1000,
+                           error_tol: float = 1e-3) -> pd.Series:
+    """
+    Iterative Bradley-Terry approach to compute preference scores from pairwise data.
+    df must have columns: ['Excerpt A', 'Excerpt B', 'Wins A', 'Wins B'].
+
+    Returns a pd.Series indexed by excerpt (game_id), sorted descending,
+    with values scaled ~ [0..100].
+    """
+    # Summation of wins for A and B
+    # Use .sum() to avoid aggregator warnings
+    winsA = df.groupby('Excerpt A')['Wins A'].sum().reset_index()
+    winsA = winsA[winsA['Wins A'] > 0]
+    winsA.columns = ['Excerpt', 'Wins']
+
+    winsB = df.groupby('Excerpt B')['Wins B'].sum().reset_index()
+    winsB = winsB[winsB['Wins B'] > 0]
+    winsB.columns = ['Excerpt', 'Wins']
+
+    # Combine total wins per excerpt
+    wins = pd.concat([winsA, winsB]).groupby('Excerpt')['Wins'].sum()
+
+    # Count total matchups
+    num_games = Counter()
+    for _, row in df.iterrows():
+        pair_key = tuple(sorted([row['Excerpt A'], row['Excerpt B']]))
+        total = row['Wins A'] + row['Wins B']
+        num_games[pair_key] += total
+
+    # All excerpt IDs
+    excerpts = sorted(set(df['Excerpt A']) | set(df['Excerpt B']))
+
+    # Initialize ranks
+    ranks = pd.Series(np.ones(len(excerpts)) / len(excerpts), index=excerpts)
+
+    # Iteration
+    for iteration in range(max_iters):
+        oldranks = ranks.copy()
+
+        for ex in excerpts:
+            ex_wins = wins.get(ex, 0.0)  # If ex never had wins, default 0
+            denom_sum = 0.0
+            for p in excerpts:
+                if p == ex:
+                    continue
+                pair = tuple(sorted([ex, p]))
+                # if they never faced each other, skip
+                if pair not in num_games:
+                    continue
+                # standard BT denominator
+                denom_sum += num_games[pair] / (ranks[ex] + ranks[p])
+
+            # update rank
+            if denom_sum != 0:
+                ranks[ex] = ex_wins / denom_sum
+            else:
+                ranks[ex] = 0.0
+
+        # normalize
+        total_ranks = ranks.sum()
+        if total_ranks > 0:
+            ranks /= total_ranks
+
+        # check convergence
+        diff = (ranks - oldranks).abs().sum()
+        if diff < error_tol:
+            logging.info(f" * Converged after {iteration} iterations.")
+            break
+
+    # scale to [0..100] for readability
+    ranks = (ranks * 100).round(2)
+    return ranks.sort_values(ascending=False)
 
 def compute_bradley_terry_scores(team_id: int) -> Dict[int, float]:
     """
-    Approximates Bradley-Terry scores using logistic regression.
-    Each game is turned into a one-hot vector, and the pairwise 
-    preference is the training signal.
-
-    Returns:
-      A dict { game_id: estimated_score }
+    Converts team votes into a DataFrame for bradley_terry_analysis.
+    Returns a dict: { game_id: score (0..100) }.
     """
     team_votes = get_votes_for_team(team_id)
     team_games = get_games_for_team(team_id)
-    if not team_votes or len(team_games) < 2:
+
+    # If no data or only 1 game, no ranking possible
+    if len(team_games) < 2 or not team_votes:
         return {g.game_id: 0.0 for g in team_games}
 
-    # Step 1: Map game_ids to indices
-    game_id_to_idx = {g.game_id: i for i, g in enumerate(team_games)}
-    n_games = len(team_games)
-
-    # Step 2: Build training data
-    # We will create a feature vector for each pair:
-    # One-hot with shape (n_games), +1 for winner, -1 for loser
-    # Label = 1 for winner-loser, 0 for loser-winner in logistic regression
-    X = []
-    y = []
+    # Build DataFrame with columns: Excerpt A, Excerpt B, Wins A, Wins B
+    pair_agg = {}
     for v in team_votes:
-        row = np.zeros(n_games)
-        win_idx = game_id_to_idx[v.winner_id]
-        lose_idx = game_id_to_idx[v.loser_id]
-        # We'll do +1 for the winner, -1 for the loser
-        row[win_idx] = 1
-        row[lose_idx] = -1
-        X.append(row)
-        # The target is 1, meaning "winner got picked over loser"
-        y.append(1)
+        A = min(v.winner_id, v.loser_id)
+        B = max(v.winner_id, v.loser_id)
+        if (A, B) not in pair_agg:
+            pair_agg[(A, B)] = [0, 0]  # [winsA, winsB]
+        # increment the winner's position
+        if v.winner_id == A:
+            pair_agg[(A, B)][0] += 1
+        else:
+            pair_agg[(A, B)][1] += 1
 
-    X = np.array(X)
-    y = np.array(y)
+    rows = []
+    for (A, B), (winsA, winsB) in pair_agg.items():
+        rows.append({
+            'Excerpt A': A,
+            'Excerpt B': B,
+            'Wins A': winsA,
+            'Wins B': winsB
+        })
+    df = pd.DataFrame(rows, columns=['Excerpt A', 'Excerpt B', 'Wins A', 'Wins B'])
 
-    # Fit logistic regression
-    # By default, scikit-learn logistic regression expects a binary classification
-    # We are basically modeling sign(X * beta) = y. We'll do a standard approach.
-    model = LogisticRegression(random_state=42)
-    model.fit(X, y)
+    bt_series = bradley_terry_analysis(df, max_iters=1000, error_tol=1e-3)
+    results = bt_series.to_dict()   # e.g. { 2: 75.4, 3: 24.6 }
+    results = {int(k): float(v) for k, v in results.items()}
+    return results
 
-    # The coefficients reflect the relative skill for each game
-    # The higher the coefficient, the stronger the preference.
-    # We can interpret them as the 'beta' in Bradley-Terry-like log-odds.
-    coefs = model.coef_.flatten()  # shape (n_games,)
 
-    # We'll store them in a dict
-    game_scores = {}
-    for g, idx in game_id_to_idx.items():
-        game_scores[g] = coefs[idx]
-
-    return game_scores
-
-# -------------------------------------------------------------------------------------
-# 5) Dash App
-# -------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# 7) Dash App
+# ------------------------------------------------------------------------------
+# Load existing data first, so the initial layout can reflect existing teams
+ensure_data_dir()
+load_data()
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+app.config.suppress_callback_exceptions = True
+app.title = "Game Preference (Bradley-Terry)"
+
+def get_team_options():
+    """Generate a list of 'label/value' pairs for the team dropdown."""
+    if not teams:
+        return []
+    return [{"label": f"{t.team_id} - {t.name}", "value": t.team_id} for t in teams.values()]
 
 app.layout = dbc.Container([
-    html.H1("Game Preference App (Bradley-Terry)"),
+    html.H1("Game Preference (Bradley-Terry)"),
 
-    # Team Creation / Selection
+    # Row: Create/Select Team
     dbc.Row([
         dbc.Col([
             html.H5("Create a New Team"),
             dbc.Input(id="create-team-name", placeholder="Team name..."),
             dbc.Button("Create Team", id="btn-create-team", color="primary", className="mt-2"),
-            html.Div(id="create-team-output", className="mt-1 text-success")
+            html.Div(id="create-team-output", className="mt-2 text-success")
         ], width=4),
 
         dbc.Col([
             html.H5("Existing Teams"),
             dcc.Dropdown(
                 id="team-select",
-                options=[],
+                options=get_team_options(),   # Pre-populate with existing teams
                 placeholder="Select a team...",
                 value=None
             ),
@@ -247,31 +369,30 @@ app.layout = dbc.Container([
 
     html.Hr(),
 
-    # Admin Stage Controls
+    # Admin stage controls
     html.H5("Admin Controls (Change Stage)"),
     dbc.RadioItems(
         id="radio-stage",
         options=[
-            {"label": "Submit", "value": "submit"},
-            {"label": "Vote", "value": "vote"},
+            {"label": "Submit",  "value": "submit"},
+            {"label": "Vote",    "value": "vote"},
             {"label": "Results", "value": "results"}
         ],
-        value="submit",
-        inline=True
+        value="submit", inline=True
     ),
     dbc.Button("Update Stage", id="btn-update-stage", color="secondary", className="ms-2"),
 
     html.Hr(),
 
-    # CONTENT AREA: Will change based on stage
+    # Dynamic content area
     html.Div(id="stage-content"),
 
 ], fluid=True)
 
-# -------------------------------------------------------------------------------------
-# 6) Callbacks
-# -------------------------------------------------------------------------------------
 
+# ------------------------------------------------------------------------------
+# 8) Callbacks
+# ------------------------------------------------------------------------------
 @app.callback(
     Output("create-team-output", "children"),
     Output("team-select", "options"),
@@ -279,17 +400,13 @@ app.layout = dbc.Container([
     State("create-team-name", "value"),
     prevent_initial_call=True
 )
-def create_team_callback(n_clicks: int, name: str):
-    """
-    Creates a new team, updates the dropdown.
-    """
-    if not name:
-        return ("No team name provided.", dash.no_update)
-    t_id = create_team(name)
-    msg = f"Team '{name}' created with ID={t_id}."
-
-    # Update dropdown options
-    opts = [{"label": f"{t.team_id} - {t.name}", "value": t.team_id} for t in teams.values()]
+def create_team_callback(n_clicks, new_team_name):
+    if not new_team_name:
+        return ("Please enter a team name.", dash.no_update)
+    t_id = create_team(new_team_name)
+    msg = f"Team '{new_team_name}' created (ID={t_id})."
+    # Refresh the dropdown options
+    opts = get_team_options()
     return (msg, opts)
 
 @app.callback(
@@ -297,36 +414,12 @@ def create_team_callback(n_clicks: int, name: str):
     Output("radio-stage", "value"),
     Input("team-select", "value")
 )
-def display_team_stage(team_id: int):
-    """
-    Shows the current stage of the selected team and sets the stage radio to match.
-    """
+def update_stage_display(team_id):
+    """When the user selects a team, show its current stage."""
     if not team_id:
         return ("No team selected.", "submit")
-
     current_stage = get_team_stage(team_id)
     return (f"Current Stage: {current_stage}", current_stage)
-
-@app.callback(
-    Output("stage-content", "children"),
-    Input("team-select", "value"),
-    Input("radio-stage", "value")
-)
-def render_stage_content(team_id: int, stage: str):
-    """
-    Renders the appropriate UI for the current stage of the selected team.
-    """
-    if not team_id:
-        return html.Div("Select or create a team first.")
-
-    if stage == "submit":
-        return render_submit_stage(team_id)
-    elif stage == "vote":
-        return render_vote_stage(team_id)
-    elif stage == "results":
-        return render_results_stage(team_id)
-    else:
-        return html.Div("Unknown stage")
 
 @app.callback(
     Output("team-stage-display", "children", allow_duplicate=True),
@@ -335,23 +428,35 @@ def render_stage_content(team_id: int, stage: str):
     State("radio-stage", "value"),
     prevent_initial_call=True
 )
-def admin_set_stage(n_clicks: int, team_id: int, stage: str):
-    """
-    Allows admin to change the stage of the selected team.
-    """
+def admin_set_stage_cb(n_clicks, team_id, new_stage):
+    """Admin sets the stage for the selected team."""
     if not team_id:
         return "No team selected."
-    set_team_stage(team_id, stage)
-    return f"Current Stage: {stage}"
+    set_team_stage(team_id, new_stage)
+    return f"Current Stage: {new_stage}"
 
-# -------------------------------------------------------------------------------------
-# 7) Stage-Specific Render Functions
-# -------------------------------------------------------------------------------------
+@app.callback(
+    Output("stage-content", "children"),
+    Input("team-select", "value"),
+    Input("radio-stage", "value")
+)
+def render_stage_content(team_id, stage):
+    """Render dynamic content depending on the selected team's stage."""
+    if not team_id:
+        return html.Div("Select or create a team first.")
+    if stage == "submit":
+        return render_submit_stage(team_id)
+    elif stage == "vote":
+        return render_vote_stage(team_id)
+    elif stage == "results":
+        return render_results_stage(team_id)
+    else:
+        return html.Div("Unknown stage.")
 
+# ------------------------------------------------------------------------------
+# 9) Stage: Submit
+# ------------------------------------------------------------------------------
 def render_submit_stage(team_id: int):
-    """
-    Returns layout allowing the user to submit new games.
-    """
     return html.Div([
         html.H4("Submit New Game"),
         dbc.Row([
@@ -361,6 +466,7 @@ def render_submit_stage(team_id: int):
                 dbc.Button("Submit Game", id="btn-submit-game", color="primary", className="mt-2"),
                 html.Div(id="submit-game-output", className="mt-2 text-success")
             ], width=4),
+
             dbc.Col([
                 html.H6("Existing Games in This Team:"),
                 html.Div(id="submit-game-list")
@@ -372,56 +478,55 @@ def render_submit_stage(team_id: int):
     Output("submit-game-output", "children"),
     Output("submit-game-list", "children"),
     Input("btn-submit-game", "n_clicks"),
-    State("team-select", "value"),
+    Input("team-select", "value"),
     State("input-game-title", "value"),
     State("input-game-image", "value"),
     prevent_initial_call=True
 )
-def handle_submit_game(n_clicks: int, team_id: int, title: str, image_url: str):
+def handle_submit_game_or_update_list(n_clicks, team_id, title, image_url):
+    """Submits a new game if the button was clicked, or updates the list if user switched teams."""
+    if not team_id:
+        return ("No team selected.", "No games yet.")
+
+    ctx = callback_context
+    if not ctx.triggered:
+        return ("", "No games yet.")
+
+    triggered_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    # If user just switched teams, only update the list
+    if triggered_id == "team-select":
+        return ("", render_game_list(team_id))
+
+    # Otherwise user submitted a new game
     if not title:
-        return ("No title provided.", dash.no_update)
+        return ("No title provided.", render_game_list(team_id))
+
     g_id = submit_game(team_id, title, image_url)
     msg = f"Game '{title}' submitted (ID={g_id})."
+    return (msg, render_game_list(team_id))
 
-    # Show updated list
-    return (msg, render_game_list_html(team_id))
-
-@app.callback(
-    Output("submit-game-list", "children"),
-    Input("team-select", "value"),
-    prevent_initial_call=True
-)
-def update_submit_game_list(team_id: int):
-    """
-    Updates the list of submitted games whenever a new team is selected.
-    """
-    return render_game_list_html(team_id)
-
-def render_game_list_html(team_id: int):
-    """
-    Utility to produce an HTML list of games for a given team.
-    """
-    team_game_objs = get_games_for_team(team_id)
-    if not team_game_objs:
-        return html.Div("No games submitted yet.")
+def render_game_list(team_id: int):
+    team_gs = get_games_for_team(team_id)
+    if not team_gs:
+        return "No games submitted yet."
     items = []
-    for g in team_game_objs:
+    for g in team_gs:
         items.append(html.Li(f"[ID={g.game_id}] {g.title} - {g.image_url or 'No Image'}"))
     return html.Ul(items)
 
+# ------------------------------------------------------------------------------
+# 10) Stage: Vote
+# ------------------------------------------------------------------------------
 def render_vote_stage(team_id: int):
-    """
-    Returns layout for A/B voting. We'll randomly pick two games to compare,
-    or if there's fewer than 2 games, show a placeholder.
-    """
-    team_game_objs = get_games_for_team(team_id)
-    if len(team_game_objs) < 2:
+    """Renders the voting UI if there are at least 2 games."""
+    if len(get_games_for_team(team_id)) < 2:
         return html.Div("Not enough games to vote on.")
 
     return html.Div([
         html.H4("Pairwise Voting"),
         html.Div(id="vote-pair-container"),
-        dbc.Button("Next Pair", id="btn-next-pair", className="mt-3", color="primary"),
+        dbc.Button("Next Pair", id="btn-next-pair", color="primary", className="mt-3"),
         html.Div(id="vote-output", className="mt-2 text-success"),
     ])
 
@@ -430,111 +535,90 @@ def render_vote_stage(team_id: int):
     Input("btn-next-pair", "n_clicks"),
     State("team-select", "value")
 )
-def display_random_pair(n_clicks: int, team_id: int):
-    """
-    Selects two random distinct games to display side-by-side.
-    """
-    import random
-    team_game_objs = get_games_for_team(team_id)
-    if len(team_game_objs) < 2:
+def display_random_pair(n_clicks, team_id):
+    all_games = get_games_for_team(team_id)
+    if len(all_games) < 2:
         return html.Div("Not enough games to vote on.")
 
-    pair = random.sample(team_game_objs, 2)
-    # Simple side by side
-    col_style = {"border": "1px solid gray", "borderRadius": "5px", "padding": "10px", "margin": "5px"}
+    pair = random.sample(all_games, 2)
+    style = {"border": "1px solid #ccc", "padding": "10px", "borderRadius": "5px", "margin": "5px"}
 
     return dbc.Row([
         dbc.Col([
             html.H5(pair[0].title),
             html.Img(src=pair[0].image_url, style={"width": "100%", "height": "auto"}) if pair[0].image_url else None,
-            dbc.Button("Choose This", id={"type": "btn-vote-winner", "index": pair[0].game_id}, color="success", className="mt-2"),
-        ], style=col_style, width=6),
+            dbc.Button("Choose This", id={"type": "btn-vote-winner", "index": pair[0].game_id},
+                       color="success", className="mt-2")
+        ], width=6, style=style),
 
         dbc.Col([
             html.H5(pair[1].title),
             html.Img(src=pair[1].image_url, style={"width": "100%", "height": "auto"}) if pair[1].image_url else None,
-            dbc.Button("Choose This", id={"type": "btn-vote-winner", "index": pair[1].game_id}, color="success", className="mt-2"),
-        ], style=col_style, width=6),
+            dbc.Button("Choose This", id={"type": "btn-vote-winner", "index": pair[1].game_id},
+                       color="success", className="mt-2")
+        ], width=6, style=style),
     ])
 
 @app.callback(
     Output("vote-output", "children"),
     [Input({"type": "btn-vote-winner", "index": dash.ALL}, "n_clicks")],
     [State({"type": "btn-vote-winner", "index": dash.ALL}, "id"),
-     State("vote-pair-container", "children"),
      State("team-select", "value")],
     prevent_initial_call=True
 )
-def handle_vote(n_clicks_list, button_ids, pair_container, team_id: int):
-    """
-    Records a vote whenever the user clicks on one of the "Choose This" buttons.
-    We must parse the *other* game as the loser from the current container.
-    """
+def handle_vote(n_clicks_list, button_ids, team_id):
+    """Records the user's vote for whichever 'Choose This' button they clicked."""
     if not any(n_clicks_list):
         raise dash.exceptions.PreventUpdate
 
-    # The clicked button is the winner.
-    # We find which button was clicked
-    # button_ids is a list of dictionaries with keys {type, index}
     triggered_idx = None
-    for i, clicks in enumerate(n_clicks_list):
-        if clicks and clicks > 0:
+    for i, click_val in enumerate(n_clicks_list):
+        if click_val and click_val > 0:
             triggered_idx = i
             break
-
     if triggered_idx is None:
         raise dash.exceptions.PreventUpdate
 
     winner_game_id = button_ids[triggered_idx]["index"]
-
-    # Attempt to find the loser by scanning the container
-    # (We stored the pair in display_random_pair)
-    # We can parse the "index" from each button's ID to see which is the "other" one.
-    # For a minimal approach, let's just re-collect them from button_ids
-    all_game_ids = [btn["index"] for btn in button_ids]
-    if len(all_game_ids) != 2:
-        return "Error: Could not identify pair."
-
-    if winner_game_id not in all_game_ids:
-        return "Error: Winner not in pair."
-
-    loser_candidates = [gid for gid in all_game_ids if gid != winner_game_id]
+    # The other is the loser
+    all_game_ids = [b["index"] for b in button_ids]
+    loser_candidates = [x for x in all_game_ids if x != winner_game_id]
     if not loser_candidates:
-        return "Error: Could not identify loser."
+        return "Error: Could not determine loser."
 
     loser_game_id = loser_candidates[0]
-
     record_vote(team_id, winner_game_id, loser_game_id)
     return f"Vote Recorded! Winner={winner_game_id}, Loser={loser_game_id}."
 
+# ------------------------------------------------------------------------------
+# 11) Stage: Results
+# ------------------------------------------------------------------------------
 def render_results_stage(team_id: int):
-    """
-    Returns a layout that displays the computed Bradley-Terry (approx.) scores
-    in a sorted manner, plus a bar chart with Plotly.
-    """
+    """Shows final Bradley-Terry ranking and bar chart."""
     scores = compute_bradley_terry_scores(team_id)
     if not scores:
-        return html.Div("No votes or not enough games to compute results.")
+        return html.Div("No votes or insufficient data to compute results.")
 
-    # Sort by descending score
+    # Sort desc by score
     sorted_items = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-
-    # Build a small table
     rows = []
-    for rank, (g_id, sc) in enumerate(sorted_items, start=1):
+    rank_count = 1
+    for g_id, scr in sorted_items:
         title = games[g_id].title
         rows.append(html.Tr([
-            html.Td(rank),
+            html.Td(rank_count),
             html.Td(title),
-            html.Td(f"{sc:.3f}")
+            html.Td(f"{scr:.2f}")
         ]))
+        rank_count += 1
 
     fig = px.bar(
-        x=[games[g_id].title for g_id, sc in sorted_items],
-        y=[sc for g_id, sc in sorted_items],
+        x=[games[g_id].title for g_id, s in sorted_items],
+        y=[s for g_id, s in sorted_items],
         labels={"x": "Game", "y": "Score"},
-        title="Estimated Bradley-Terry Scores"
+        title="Bradley-Terry Scores"
     )
+    fig.update_layout(height=500)
 
     return html.Div([
         html.H4("Results"),
@@ -543,16 +627,14 @@ def render_results_stage(team_id: int):
             [html.Tbody(rows)],
             bordered=True
         ),
-        dcc.Graph(figure=fig, style={"width": "100%", "height": "500px"}),
-        html.Div("Note: Higher score indicates stronger preference in pairwise votes.")
+        dcc.Graph(figure=fig, style={"width": "100%"}),
+        html.Div("Higher score indicates stronger preference from pairwise votes.")
     ])
 
-# -------------------------------------------------------------------------------------
-# MAIN
-# -------------------------------------------------------------------------------------
 
+# ------------------------------------------------------------------------------
+# 12) Main Entry
+# ------------------------------------------------------------------------------
 if __name__ == "__main__":
-    # Optionally, create a default team to start with:
-    default_team_id = create_team("Example Team")
-    print(f"Default team created with ID={default_team_id}.")
+    logging.basicConfig(level=logging.INFO)
     app.run_server(debug=True)
