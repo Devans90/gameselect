@@ -1,37 +1,17 @@
 {
-  "1": {
-    "team_id": 1,
-    "name": "DanAwesome",
-    "stage": "submit"
-  },
   "2": {
     "team_id": 2,
     "name": "DanAwesome",
     "stage": "results"
   },
-  "3": {
-    "team_id": 3,
-    "name": "1",
-    "stage": "submit"
-  },
-  "4": {
-    "team_id": 4,
-    "name": "DanAwesome",
-    "stage": "submit"
-  },
-  "5": {
-    "team_id": 5,
-    "name": "1",
-    "stage": "submit"
-  },
-  "6": {
-    "team_id": 6,
-    "name": "2",
-    "stage": "submit"
-  },
   "7": {
     "team_id": 7,
     "name": "Turtles",
+    "stage": "submit"
+  },
+  "9": {
+    "team_id": 9,
+    "name": "TMNT",
     "stage": "submit"
   }
 }
