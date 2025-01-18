@@ -1,0 +1,17 @@
+{
+  "2": {
+    "team_id": 2,
+    "name": "DanAwesome",
+    "stage": "results"
+  },
+  "7": {
+    "team_id": 7,
+    "name": "Turtles",
+    "stage": "submit"
+  },
+  "9": {
+    "team_id": 9,
+    "name": "TMNT",
+    "stage": "submit"
+  }
+}

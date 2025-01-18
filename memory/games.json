@@ -1,0 +1,420 @@
+{
+  "4": {
+    "game_id": 4,
+    "team_id": 2,
+    "title": "Sausage",
+    "image_url": null,
+    "embedding": null
+  },
+  "5": {
+    "game_id": 5,
+    "team_id": 2,
+    "title": "green",
+    "image_url": null,
+    "embedding": null
+  },
+  "6": {
+    "game_id": 6,
+    "team_id": 2,
+    "title": "hunger games",
+    "image_url": null,
+    "embedding": null
+  },
+  "7": {
+    "game_id": 7,
+    "team_id": 2,
+    "title": "fido",
+    "image_url": null,
+    "embedding": null
+  },
+  "8": {
+    "game_id": 8,
+    "team_id": 2,
+    "title": "dracula",
+    "image_url": null,
+    "embedding": null
+  },
+  "9": {
+    "game_id": 9,
+    "team_id": 2,
+    "title": "spyro",
+    "image_url": null,
+    "embedding": null
+  },
+  "10": {
+    "game_id": 10,
+    "team_id": 2,
+    "title": "25",
+    "image_url": null,
+    "embedding": null
+  },
+  "11": {
+    "game_id": 11,
+    "team_id": 2,
+    "title": "donatello",
+    "image_url": null,
+    "embedding": null
+  },
+  "12": {
+    "game_id": 12,
+    "team_id": 2,
+    "title": "leanardo",
+    "image_url": null,
+    "embedding": null
+  },
+  "13": {
+    "game_id": 13,
+    "team_id": 2,
+    "title": "puppy",
+    "image_url": null,
+    "embedding": null
+  },
+  "14": {
+    "game_id": 14,
+    "team_id": 2,
+    "title": "pizza",
+    "image_url": null,
+    "embedding": null
+  },
+  "15": {
+    "game_id": 15,
+    "team_id": 7,
+    "title": "Donatello",
+    "image_url": null,
+    "embedding": null
+  },
+  "16": {
+    "game_id": 16,
+    "team_id": 7,
+    "title": "Splinter",
+    "image_url": null,
+    "embedding": null
+  },
+  "17": {
+    "game_id": 17,
+    "team_id": 7,
+    "title": "Leanardo",
+    "image_url": null,
+    "embedding": null
+  },
+  "18": {
+    "game_id": 18,
+    "team_id": 7,
+    "title": "teenage ",
+    "image_url": "https://via.placeholder.com/400?text=teenage+",
+    "embedding": [
+      0.483,
+      0.569,
+      0.489,
+      0.117,
+      0.735,
+      0.145,
+      0.285,
+      0.768
+    ]
+  },
+  "19": {
+    "game_id": 19,
+    "team_id": 7,
+    "title": "Sausage",
+    "image_url": "https://via.placeholder.com/400?text=Sausage",
+    "embedding": [
+      0.44,
+      0.54,
+      0.925,
+      0.142,
+      0.972,
+      0.318,
+      0.21,
+      0.321
+    ]
+  },
+  "20": {
+    "game_id": 20,
+    "team_id": 7,
+    "title": "pizza",
+    "image_url": "https://via.placeholder.com/400?text=pizza",
+    "embedding": [
+      0.0,
+      0.209,
+      0.073,
+      0.451,
+      0.283,
+      0.459,
+      0.117,
+      0.125
+    ]
+  },
+  "21": {
+    "game_id": 21,
+    "team_id": 7,
+    "title": "pizza",
+    "image_url": "https://via.placeholder.com/400?text=pizza",
+    "embedding": [
+      0.016,
+      0.882,
+      0.83,
+      0.809,
+      0.325,
+      0.654,
+      0.433,
+      0.178
+    ]
+  },
+  "25": {
+    "game_id": 25,
+    "team_id": 9,
+    "title": "Donatello",
+    "image_url": "https://www.donatello.net/assets/img/donatello.jpg",
+    "embedding": [
+      0.66,
+      0.882,
+      0.537,
+      0.11,
+      0.666,
+      0.649,
+      0.762,
+      0.825
+    ]
+  },
+  "26": {
+    "game_id": 26,
+    "team_id": 9,
+    "title": "Raphael",
+    "image_url": "https://physics.berkeley.edu/sites/default/files/raphael_bousso2.jpg?timestamp=1657907876",
+    "embedding": [
+      0.93,
+      0.76,
+      0.411,
+      0.219,
+      0.399,
+      0.248,
+      0.814,
+      0.828
+    ]
+  },
+  "27": {
+    "game_id": 27,
+    "team_id": 9,
+    "title": "pizza",
+    "image_url": "https://images.ctfassets.net/j8tkpy1gjhi5/5OvVmigx6VIUsyoKz1EHUs/b8173b7dcfbd6da341ce11bcebfa86ea/Salami-pizza-hero.jpg",
+    "embedding": [
+      0.217,
+      0.614,
+      0.033,
+      0.423,
+      0.233,
+      0.325,
+      0.483,
+      0.718
+    ]
+  },
+  "28": {
+    "game_id": 28,
+    "team_id": 9,
+    "title": "Shark",
+    "image_url": "https://upload.wikimedia.org/wikipedia/commons/0/08/Corl0207_%2828225976491%29.jpg",
+    "embedding": [
+      0.371,
+      0.835,
+      0.976,
+      0.747,
+      0.677,
+      0.128,
+      0.39,
+      0.247
+    ]
+  },
+  "29": {
+    "game_id": 29,
+    "team_id": 9,
+    "title": "Dog",
+    "image_url": "https://canine.org/wp-content/uploads/2024/11/Q3-24-HP-promo.jpg",
+    "embedding": [
+      0.259,
+      0.402,
+      0.842,
+      0.17,
+      0.857,
+      0.248,
+      0.957,
+      0.332
+    ]
+  },
+  "30": {
+    "game_id": 30,
+    "team_id": 9,
+    "title": "teenage ",
+    "image_url": "https://raisingchildren.net.au/__data/assets/image/0023/52628/teenage-friendships_narrow.jpg",
+    "embedding": [
+      0.679,
+      0.796,
+      0.253,
+      0.1,
+      0.546,
+      0.962,
+      0.135,
+      0.81
+    ]
+  },
+  "31": {
+    "game_id": 31,
+    "team_id": 9,
+    "title": "Splinter",
+    "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Splinter.jpg/1200px-Splinter.jpg",
+    "embedding": [
+      0.918,
+      0.178,
+      0.12,
+      0.683,
+      0.471,
+      0.93,
+      0.368,
+      0.796
+    ]
+  },
+  "32": {
+    "game_id": 32,
+    "team_id": 9,
+    "title": "Michalagelo",
+    "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Michelangelo_Daniele_da_Volterra_%28dettaglio%29.jpg/640px-Michelangelo_Daniele_da_Volterra_%28dettaglio%29.jpg",
+    "embedding": [
+      0.567,
+      0.492,
+      0.342,
+      0.853,
+      0.503,
+      0.346,
+      0.907,
+      0.058
+    ]
+  },
+  "33": {
+    "game_id": 33,
+    "team_id": 9,
+    "title": "Roses",
+    "image_url": "https://cdn.sanity.io/images/pn4rwssl/production/349d734442fdbcc734bd8060f126330fdf19e825-500x750.jpg?w=2880&q=75&auto=format",
+    "embedding": [
+      0.397,
+      0.455,
+      0.121,
+      0.269,
+      0.896,
+      0.2,
+      0.592,
+      0.817
+    ]
+  },
+  "34": {
+    "game_id": 34,
+    "team_id": 9,
+    "title": "Fire",
+    "image_url": "https://www.science.org/cms/10.1126/science.adl5889/asset/e85ee444-527e-4487-b5d4-7dbed53321ec/assets/images/large/science.adl5889-fa.jpg",
+    "embedding": [
+      0.463,
+      0.975,
+      0.745,
+      0.894,
+      0.899,
+      0.914,
+      0.868,
+      0.947
+    ]
+  },
+  "35": {
+    "game_id": 35,
+    "team_id": 9,
+    "title": "Yellow",
+    "image_url": "https://cdn.sanity.io/images/599r6htc/regionalized/d784c4f0657a9e8ffb5d28564cf737f8c9edbe13-1440x810.png?w=1200&q=70&fit=max&auto=format",
+    "embedding": [
+      0.408,
+      0.67,
+      0.332,
+      0.04,
+      0.98,
+      0.096,
+      0.199,
+      0.931
+    ]
+  },
+  "36": {
+    "game_id": 36,
+    "team_id": 9,
+    "title": "Green",
+    "image_url": "https://cdn.sanity.io/images/599r6htc/regionalized/0c1f722272b0e85c2a4eb4fd101bb0b7534917b7-1440x810.png?w=1200&q=70&fit=max&auto=format",
+    "embedding": [
+      0.145,
+      0.297,
+      0.838,
+      0.312,
+      0.151,
+      0.315,
+      0.209,
+      0.006
+    ]
+  },
+  "37": {
+    "game_id": 37,
+    "team_id": 9,
+    "title": "December",
+    "image_url": "https://images6.alphacoders.com/134/1340445.png",
+    "embedding": [
+      0.337,
+      0.743,
+      0.331,
+      0.706,
+      0.375,
+      0.576,
+      0.165,
+      0.414
+    ]
+  },
+  "38": {
+    "game_id": 38,
+    "team_id": 9,
+    "title": "3",
+    "image_url": "https://m.media-amazon.com/images/M/MV5BMjZjNjE5NDEtOWJjYS00Mjk2LWI1ZDYtOWI1ZWI3MzRjM2UzXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+    "embedding": [
+      0.434,
+      0.625,
+      0.566,
+      0.345,
+      0.19,
+      0.582,
+      0.531,
+      0.328
+    ]
+  },
+  "39": {
+    "game_id": 39,
+    "team_id": 9,
+    "title": "Toes",
+    "image_url": "https://podiatryassociates.org/wp-content/uploads/2020/11/Hammer-toe-1.jpg",
+    "embedding": [
+      0.412,
+      0.056,
+      0.108,
+      0.844,
+      0.457,
+      0.359,
+      0.977,
+      0.472
+    ]
+  },
+  "40": {
+    "game_id": 40,
+    "team_id": 9,
+    "title": "Katana",
+    "image_url": "https://katana-sword.com/cdn/shop/files/KatanaJin3_600x.jpg?v=1716299525",
+    "embedding": [
+      0.277,
+      0.642,
+      0.581,
+      0.161,
+      0.087,
+      0.24,
+      0.533,
+      0.454
+    ]
+  }
+}
